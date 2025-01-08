@@ -1,0 +1,4 @@
+CREATE DATABASE DI_UBI_Reservas;
+GO
+USE DI_UBI_Reservas;
+GO
