@@ -1,37 +1,34 @@
 CREATE OR ALTER VIEW HistoricoCompleto AS
 SELECT 
-    hr.ID_Historico,
-    hr.ID_Reserva,
-    NULL AS ID_Requisicao, -- Não aplicável para reservas
-    hr.ID_Utilizador,
+    r.ID_Reserva,
+    NULL AS ID_Requisicao,
+    r.ID_Utilizador,
     u.Nome AS Nome_Utilizador,
-    hr.ID_Equipamento,
+    re.ID_Equipamento,
     e.Nome_Equipamento,
-    hr.Estado,
-    hr.Data_Inicio_Pedido AS Data_Inicio,
-    hr.Data_Registro
-FROM Historico_Reservas hr
-LEFT JOIN Utilizador u ON hr.ID_Utilizador = u.ID_Utilizador
-LEFT JOIN Equipamento e ON hr.ID_Equipamento = e.ID_Equipamento
+    r.Estado,
+    r.Data_Inicio_Pedido AS Data_Inicio,
+    r.TimeStamp_Reserva AS Data_Registro
+FROM Reserva r
+LEFT JOIN Utilizador u ON r.ID_Utilizador = u.ID_Utilizador
+LEFT JOIN ReservaEquipamento re ON r.ID_Reserva = re.ID_Reserva
+LEFT JOIN Equipamento e ON re.ID_Equipamento = e.ID_Equipamento
 UNION ALL
 SELECT 
-    hq.ID_Historico,
-    NULL AS ID_Reserva, -- Não aplicável para requisições
-    hq.ID_Requisicao,
-    hq.ID_Utilizador,
+    NULL AS ID_Reserva,
+    rq.ID_Requisicao,
+    rq.ID_Utilizador,
     u.Nome AS Nome_Utilizador,
-    hq.ID_Equipamento,
+    rq.ID_Equipamento,
     e.Nome_Equipamento,
-    hq.Estado_Requisicao AS Estado,
-    hq.Data_Requisicao AS Data_Inicio,
-    hq.Data_Registro
-FROM Historico_Requisicoes hq
-LEFT JOIN Utilizador u ON hq.ID_Utilizador = u.ID_Utilizador
-LEFT JOIN Equipamento e ON hq.ID_Equipamento = e.ID_Equipamento;
+    rq.Estado_Requisicao AS Estado,
+    rq.Data_Inicio_Requisicao AS Data_Inicio,
+    rq.Data_Inicio_Requisicao AS Data_Registro
+FROM Requisicao rq
+LEFT JOIN Utilizador u ON rq.ID_Utilizador = u.ID_Utilizador
+LEFT JOIN Equipamento e ON rq.ID_Equipamento = e.ID_Equipamento;
 
-
-
-CREATE VIEW ReservasPreemptadas AS
+CREATE OR ALTER VIEW ReservasPreemptadas AS
 SELECT 
     r.ID_Reserva AS Reserva_Impactada,
     r.ID_Utilizador AS Utilizador_Impactado,
@@ -48,12 +45,11 @@ INNER JOIN ReservaEquipamento re2 ON re1.ID_Equipamento = re2.ID_Equipamento
 INNER JOIN Reserva rp ON re2.ID_Reserva = rp.ID_Reserva
 INNER JOIN Utilizador u1 ON r.ID_Utilizador = u1.ID_Utilizador
 INNER JOIN Utilizador u2 ON rp.ID_Utilizador = u2.ID_Utilizador
-WHERE r.Estado = 'waiting' -- Reservas impactadas
-  AND rp.Estado = 'active' -- Reservas prioritárias que causaram o impacto
-  AND r.ID_Reserva <> rp.ID_Reserva; -- Evitar que a reserva impactada e prioritária sejam a mesma
+WHERE r.Estado = 'waiting' 
+  AND rp.Estado = 'active' 
+  AND r.ID_Reserva <> rp.ID_Reserva;
 
-
-CREATE VIEW PenalizacoesUtilizadores AS
+CREATE OR ALTER VIEW PenalizacoesUtilizadores AS
 SELECT 
     p.ID_Penalizacao,
     p.ID_Utilizador,
@@ -68,19 +64,17 @@ SELECT
 FROM Penalizacao p
 INNER JOIN Utilizador u ON p.ID_Utilizador = u.ID_Utilizador;
 
-
-
-CREATE VIEW ResourceState AS
+CREATE OR ALTER VIEW ResourceState AS
 SELECT 
     e.ID_Equipamento,
     e.Nome_Equipamento,
     CASE 
-        WHEN e.Estado_Equipamento = 'disponível' THEN 'Available'
+        WHEN e.Estado_Equipamento = 'disponÃ­vel' THEN 'Available'
         WHEN e.Estado_Equipamento = 'reservado' THEN 'Reserved'
         WHEN e.Estado_Equipamento = 'em uso' THEN 'InUse'
         ELSE 'Unknown'
     END AS Estado,
-    ISNULL(r.ID_Reserva, rq.ID_Requisicao) AS ID, -- ID da reserva ou requisição
+    ISNULL(r.ID_Reserva, rq.ID_Requisicao) AS ID,
     ISNULL(u.ID_Utilizador, 'N/A') AS ID_Utilizador,
     ISNULL(u.Nome, 'N/A') AS Nome_Utilizador
 FROM Equipamento e
@@ -89,8 +83,7 @@ LEFT JOIN Reserva r ON re.ID_Reserva = r.ID_Reserva
 LEFT JOIN Requisicao rq ON e.ID_Equipamento = rq.ID_Equipamento
 LEFT JOIN Utilizador u ON ISNULL(r.ID_Utilizador, rq.ID_Utilizador) = u.ID_Utilizador;
 
-
-CREATE VIEW RequisicoesAtivas AS
+CREATE OR ALTER VIEW RequisicoesAtivas AS
 SELECT 
     rq.ID_Requisicao,
     rq.ID_Utilizador,
@@ -105,9 +98,7 @@ INNER JOIN Utilizador u ON rq.ID_Utilizador = u.ID_Utilizador
 INNER JOIN Equipamento e ON rq.ID_Equipamento = e.ID_Equipamento
 WHERE rq.Estado_Requisicao = 'active';
 
-
-
-CREATE VIEW EquipamentosPorTipoUtilizador AS
+CREATE OR ALTER VIEW EquipamentosPorTipoUtilizador AS
 SELECT 
     e.ID_Equipamento,
     e.Nome_Equipamento,
@@ -119,5 +110,3 @@ LEFT JOIN Reserva r ON re.ID_Reserva = r.ID_Reserva
 LEFT JOIN Utilizador u ON r.ID_Utilizador = u.ID_Utilizador
 LEFT JOIN Tipo_Utilizador tu ON u.ID_TipoUtilizador = tu.ID_TipoUtilizador
 GROUP BY e.ID_Equipamento, e.Nome_Equipamento, tu.Tipo_Utilizador;
-
-
