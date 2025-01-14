@@ -41,10 +41,10 @@ This project implements an equipment reservation and requisition management syst
 ---
 
 ## Data Modeling
-- [ ] Entity-Relationship Diagram.
-- ![Entity-Relationship Diagram](https://imgur.com/a/Hvx03Eg)
+- Entity-Relationship Diagram.
+- ![Entity-Relationship Diagram](https://imgur.com/L8grXm6)
 - Relational Schema (well-defined tables with relationships and constraints).
-- ![Relational Schema](https://imgur.com/a/AVcxBL9)
+- ![Relational Schema](https://imgur.com/pwFW3cs)
 
 ---
 
@@ -193,7 +193,7 @@ END;
 ---
 
 ## Screenshots
-- ![API](https://imgur.com/a/V354cu8)
+- ![API](https://imgur.com/lmhmJtB)
 
 ---
 
