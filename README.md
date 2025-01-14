@@ -1,40 +1,224 @@
-# Equipment Reservation Requisition
 
-This project includes diagrams that are essential for understanding the database schema and relationships. Follow the instructions below to open and visualize the diagrams.
+# Equipment Reservation Management System - DI-UBI
 
-## Contents
-- **Diagram.erdplus**: Entity-Relationship (ER) Diagram.
-- **Schema.erdplus**: Relational Schema.
+## Summary
+This project implements an equipment reservation and requisition management system for the Department of Informatics at the University of Beira Interior (DI-UBI). It regulates the use of shared resources, such as laptops and projectors, applying priority rules and business logic to ensure fair and efficient allocation.
 
-## Requirements
-To open and display the diagrams, you will need the following:
-- An **ERD tool** that supports `.erdplus` files, such as [ERDPlus](https://erdplus.com).
-- A browser (ERDPlus works entirely online).
+---
 
-## How to Load and Visualize the Diagrams
-1. **Download the Files**:
-   - Clone the repository or download the files manually from the `Diagram/RelationalSchema` folder.
-   - Locate the files `Diagram.erdplus` and `Schema.erdplus`.
+## Objectives
+- Manage reservations and requisitions for shared equipment.
+- Implement dynamic priority rules based on user type and history.
+- Automate state transitions and apply penalties automatically.
 
-2. **Open ERDPlus**:
-   - Go to [ERDPlus](https://erdplus.com) and log in (or create an account if you don’t have one).
+---
 
-3. **Import the Files**:
-   - Click on the **Import** button in the top-right corner of the ERDPlus interface.
-   - Choose the `.erdplus` file you want to load (either `Diagram.erdplus` or `Schema.erdplus`).
+## Technologies Used
+- **Database**: Microsoft SQL Server
+- **Frontend**: Python (or other suggested environments)
+- **Modeling Tools**: ERD Plus for entity-relationship diagrams
 
-4. **View and Edit**:
-   - The diagram will load into the workspace.
-   - You can explore or edit the diagrams as needed.
+---
 
-5. **Export (Optional)**:
-   - If needed, you can export the diagram as an image or PDF for easy sharing:
-     - Click on **Export** and choose your desired format.
+## Key Features
+1. **Reservations**:
+   - Generate unique IDs for reservations.
+   - Manage states: *active*, *waiting*, *satisfied*, *canceled*, and *forgotten*.
+   - Support preemption based on priority.
 
-## Troubleshooting
-- If the diagrams fail to load:
-  - Ensure you uploaded the correct `.erdplus` file.
-  - Verify your internet connection as ERDPlus requires online access.
-- For further assistance, refer to the [ERDPlus Help](https://erdplus.com/help).
+2. **Requisitions**:
+   - Automatically convert satisfied reservations into requisitions.
+   - Track equipment usage states.
 
-Feel free to reach out if you have any questions or encounter any issues!
+3. **Priority Rules**:
+   - Initial assignment based on user type.
+   - Dynamic penalties and promotions based on user behavior.
+
+4. **Automation with Triggers and Procedures**:
+   - Automate state updates.
+   - Apply penalties for delays and cancellations.
+
+---
+
+## Data Modeling
+- [ ] Entity-Relationship Diagram.
+- ![Entity-Relationship Diagram](https://imgur.com/a/Hvx03Eg)
+- Relational Schema (well-defined tables with relationships and constraints).
+- ![Relational Schema](https://imgur.com/a/AVcxBL9)
+
+---
+
+## Code Highlights
+### **Stored Procedure: Reserve2Requisition**
+```sql
+CREATE PROCEDURE [dbo].[Reserve2Requisition] (@ID_Reserva VARCHAR(8))
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Variáveis auxiliares
+    DECLARE @Data_Inicio DATETIME;
+    DECLARE @Data_Fim DATETIME;
+    DECLARE @ID_Utilizador VARCHAR(50);
+
+    -- Obter dados da reserva
+    SELECT 
+        @Data_Inicio = Data_Inicio_Real,
+        @Data_Fim = Data_Fim_Real,
+        @ID_Utilizador = ID_Utilizador
+    FROM Reserva
+    WHERE ID_Reserva = @ID_Reserva AND Estado = 'satisfied';
+
+
+    INSERT INTO Requisicao (ID_Requisicao, Data_Inicio_Requisicao, Estado_Requisicao, Data_Fim_Requisicao, ID_Reserva, ID_Equipamento, ID_Utilizador)
+    SELECT 
+        ISNULL((SELECT MAX(ID_Requisicao) FROM Requisicao), 0) + ROW_NUMBER() OVER (ORDER BY ID_Equipamento) AS ID_Requisicao,
+        GETDATE(),
+        'active',
+        @Data_Fim,
+        @ID_Reserva,
+        ID_Equipamento,
+        @ID_Utilizador
+    FROM ReservaEquipamento RE
+    WHERE ID_Reserva = @ID_Reserva
+      AND NOT EXISTS (
+          SELECT 1 
+          FROM Requisicao R
+          WHERE R.ID_Reserva = RE.ID_Reserva
+            AND R.ID_Equipamento = RE.ID_Equipamento
+      );
+END;
+
+```
+
+### **Trigger: Handle All Preemptions**
+```sql
+
+CREATE OR ALTER TRIGGER [dbo].[trg_HandleAllPreemptions]
+ON [dbo].[Reserva]
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Criar tabela temporária para armazenar estados calculados
+    CREATE TABLE #ReservasAtualizadas (
+        ID_Reserva NVARCHAR(10),
+        Estado NVARCHAR(10)
+    );
+
+    -- Determinar a reserva vencedora acima de 48 horas
+    INSERT INTO #ReservasAtualizadas (ID_Reserva, Estado)
+    SELECT 
+        rc.ID_Reserva,
+        CASE 
+            WHEN rc.ID_Reserva = vencedoras.ID_Reserva THEN 'active'
+            ELSE 'waiting'
+        END AS Estado
+    FROM dbo.ReservaEquipamento re
+    INNER JOIN dbo.Reserva rc ON re.ID_Reserva = rc.ID_Reserva
+    INNER JOIN (
+        SELECT 
+            re.ID_Equipamento,
+            rc.ID_Reserva,
+            ROW_NUMBER() OVER (
+                PARTITION BY re.ID_Equipamento
+                ORDER BY 
+                    CASE 
+                        WHEN DATEDIFF(HOUR, GETDATE(), rc.Data_Inicio_Pedido) > 48 THEN
+                            CASE u.Prioridade
+                                WHEN 'Maxima' THEN 5
+                                WHEN 'Acima da Media' THEN 4
+                                WHEN 'Media' THEN 3
+                                WHEN 'Abaixo da Media' THEN 2
+                                WHEN 'Minima' THEN 1
+                                ELSE 0
+                            END
+                        ELSE 0
+                    END DESC,
+                    rc.TimeStamp_Reserva ASC
+            ) AS RN
+        FROM dbo.ReservaEquipamento re
+        INNER JOIN dbo.Reserva rc ON re.ID_Reserva = rc.ID_Reserva
+        INNER JOIN dbo.Utilizador u ON rc.ID_Utilizador = u.ID_Utilizador
+        WHERE DATEDIFF(HOUR, GETDATE(), rc.Data_Inicio_Pedido) > 48
+          AND rc.Estado IN ('active', 'waiting')
+    ) AS vencedoras
+    ON re.ID_Equipamento = vencedoras.ID_Equipamento
+       AND vencedoras.RN = 1;
+
+-- Determinar a reserva vencedora abaixo de 48 horas
+INSERT INTO #ReservasAtualizadas (ID_Reserva, Estado)
+SELECT 
+    rc.ID_Reserva,
+    CASE 
+        WHEN rc.TimeStamp_Reserva = ISNULL(vencedoras.MaisAntigaPresidente, vencedoras.MaisAntigaOutro) THEN 'active'
+        ELSE 'waiting'
+    END AS Estado
+FROM dbo.ReservaEquipamento re
+INNER JOIN dbo.Reserva rc ON re.ID_Reserva = rc.ID_Reserva
+INNER JOIN dbo.Utilizador u ON rc.ID_Utilizador = u.ID_Utilizador
+INNER JOIN (
+    -- Determinar a reserva mais antiga para cada equipamento, priorizando o Presidente
+    SELECT 
+        re.ID_Equipamento,
+        MIN(CASE 
+                WHEN u.ID_TipoUtilizador = 'PD' THEN rc.TimeStamp_Reserva 
+                ELSE NULL 
+            END) AS MaisAntigaPresidente,
+        MIN(CASE 
+                WHEN u.ID_TipoUtilizador <> 'PD' THEN rc.TimeStamp_Reserva
+                ELSE NULL 
+            END) AS MaisAntigaOutro
+    FROM dbo.ReservaEquipamento re
+    INNER JOIN dbo.Reserva rc ON re.ID_Reserva = rc.ID_Reserva
+    INNER JOIN dbo.Utilizador u ON rc.ID_Utilizador = u.ID_Utilizador
+    WHERE DATEDIFF(HOUR, GETDATE(), rc.Data_Inicio_Pedido) <= 48
+      AND rc.Estado IN ('active', 'waiting')
+    GROUP BY re.ID_Equipamento
+) AS vencedoras
+ON re.ID_Equipamento = vencedoras.ID_Equipamento;
+    -- Atualizar os estados na tabela Reserva
+    UPDATE r
+    SET r.Estado = ru.Estado
+    FROM dbo.Reserva r
+    INNER JOIN #ReservasAtualizadas ru ON r.ID_Reserva = ru.ID_Reserva
+	WHERE r.Estado NOT IN ('forgotten', 'canceled', 'satisfied');
+
+    -- Limpar tabela temporária
+    DROP TABLE #ReservasAtualizadas;
+END;
+```
+
+---
+
+## Screenshots
+- ![API](https://imgur.com/a/V354cu8)
+
+---
+
+## Challenges and Lessons Learned
+- **Challenges**: Ensuring business rule consistency with complex triggers.
+- **Lessons Learned**: Developing robust systems with dynamic business logic.
+
+---
+
+## How to Run the Project
+1. Set up Microsoft SQL Server and import the provided scripts.
+2. Install the dependencies for the Python frontend.
+3. Follow the instructions in `API.py` to set up the database connection.
+4. Run the application using `API.py`.
+
+---
+
+## Authors
+Developed by Francisco Pereira.
+
+---
+
+## License
+This project was created to showcase and demonstrate advanced skills in database design, implementation, and integration with real-world business logic. It highlights expertise in areas such as:
+- Relational database modeling and normalization.
+- Development of stored procedures, triggers, and views.
+- Implementation of dynamic rules and automated processes.
+
