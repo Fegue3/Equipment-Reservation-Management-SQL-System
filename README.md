@@ -8,7 +8,7 @@ This project implements an equipment reservation and requisition management syst
 
 ## Objectives
 - Manage reservations and requisitions for shared equipment.
-- Implement dynamic priority rules based on user type and history.
+- Implement priority rules based on user type and history.
 - Automate state transitions and apply penalties automatically.
 
 ---
