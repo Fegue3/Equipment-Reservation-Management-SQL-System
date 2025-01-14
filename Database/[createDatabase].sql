@@ -1,4 +1,4 @@
-CREATE DATABASE DI_UBI_Reservas;
+CREATE DATABASE DI_Reservas;
 GO
 USE DI_UBI_Reservas;
 GO
