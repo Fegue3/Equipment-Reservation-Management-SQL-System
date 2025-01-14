@@ -1,8 +1,8 @@
 
-# Equipment Reservation Management System - DI-UBI
+# Equipment Reservation Management System
 
 ## Summary
-This project implements an equipment reservation and requisition management system for the Department of Informatics at the University of Beira Interior (DI-UBI). It regulates the use of shared resources, such as laptops and projectors, applying priority rules and business logic to ensure fair and efficient allocation.
+This project implements an equipment reservation and requisition management system for the Department of Informatics. It regulates the use of shared resources, such as laptops and projectors, applying priority rules and business logic to ensure fair and efficient allocation.
 
 ---
 
