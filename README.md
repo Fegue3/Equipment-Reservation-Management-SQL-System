@@ -212,7 +212,7 @@ END;
 ---
 
 ## Authors
-Developed by Francisco Pereira.
+Developed by Francisco Pereira, Daniel Cardoso and Fábio Horta.
 
 ---
 
